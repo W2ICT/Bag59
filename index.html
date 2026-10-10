@@ -65,6 +65,17 @@ button{min-height:52px;font-size:1.05rem}
  .bags figure{max-width:none}
  .bags figcaption{text-align:center}
 }
+.chips{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.chips li{border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:.9rem;background:var(--bg)}
+#pinRow:not([hidden]){display:flex;gap:8px}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:380px){.btns{grid-template-columns:1fr}}
+dialog{background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:16px;width:min(94vw,760px);max-height:84vh;box-sizing:border-box;flex-direction:column;gap:12px}
+dialog[open]{display:flex}
+dialog::backdrop{background:rgba(8,14,26,.6)}
+.dh{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.dh button{min-height:40px;padding:6px 14px}
+dialog .tw{overflow:auto;min-height:0}
 .msg{padding:12px;border-radius:6px;border:1px solid var(--line)}
 .msg.ok{color:var(--ok);border-color:var(--ok)}.msg.err{color:var(--warn);border-color:var(--warn)}
 .bar{height:10px;background:var(--bg);border-radius:5px;overflow:hidden;border:1px solid var(--line)}
@@ -103,16 +114,28 @@ th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);white-
  </form>
 
  <section class="card" id="admin" hidden>
-  <h2>สรุปผล (เฉพาะผู้จัดทำ)</h2>
+  <h2>สถานะการส่งข้อมูล</h2>
   <div class="bar"><i id="barFill" style="width:0"></i></div>
   <p id="prog">กำลังโหลด…</p>
-  <div class="tw"><table><thead><tr><th>รหัส</th><th>ชื่อ-นามสกุล</th><th>ข้อความที่ปัก</th></tr></thead><tbody id="rows"></tbody></table></div>
-  <div><strong>ยังไม่ตอบ</strong><p class="mute" id="missing"></p></div>
-  <button class="ghost" id="dl" type="button">ดาวน์โหลด CSV</button>
+  <div><strong id="missHead">ยังไม่ส่งข้อมูล</strong><ul class="chips" id="missing"></ul></div>
+  <div class="btns">
+   <button type="button" id="viewAll">ดูข้อมูลทั้งหมด</button>
+   <button type="button" class="ghost" id="xl">ส่งออก Excel</button>
+  </div>
+  <form id="pinRow" hidden autocomplete="off">
+   <input id="pin" type="password" inputmode="numeric" maxlength="8" placeholder="ใส่รหัสเพื่อส่งออก" aria-label="รหัสส่งออก" style="flex:1">
+   <button type="submit">ยืนยัน</button>
+  </form>
+  <p id="pinMsg" class="mute" role="status"></p>
  </section>
+ <dialog id="dlg" aria-labelledby="dlgT">
+  <div class="dh"><h2 id="dlgT">ข้อมูลทั้งหมด</h2><button type="button" class="ghost" id="dclose">ปิด</button></div>
+  <div class="tw"><table><thead><tr><th>รหัส</th><th>ชื่อ-นามสกุล</th><th>ข้อความที่ปัก</th><th>เวลาที่ส่ง</th></tr></thead><tbody id="rows"></tbody></table></div>
+ </dialog>
 </main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
-const SHEET_URL='https://script.google.com/macros/s/AKfycbw-eC-3yXrGnv8-43txcYyTOPcQdVpMfXig6pox6MdACgfXFtQvx37wBcSOWHCntA3p/exec';
+const SHEET_URL='https://script.google.com/macros/s/AKfycbzueS7kb34JvetjeN8au88CxsWetIukGqybtGwf64JRUfMuCN-MWdryNoAog9M9itgg/exec';
 const ROSTER=[{"id": "31017", "fn": "กรวิชญ์พงศ์", "ln": "สุนทรนิธิกุล"}, {"id": "31020", "fn": "กฤติณัฐ", "ln": "จิตธราพงษ์"}, {"id": "31025", "fn": "กฤษณนันทน์", "ln": "พึ่งทัศน์"}, {"id": "31039", "fn": "กิตติพศ", "ln": "ภาคภูมิ"}, {"id": "31055", "fn": "จักรภัทรณ์", "ln": "วรรณภาสชัยยง"}, {"id": "31061", "fn": "จิรัฏฐ์", "ln": "สายสุวรรณ"}, {"id": "31063", "fn": "จิรภัทร", "ln": "แสงมีอานุภาพ"}, {"id": "31076", "fn": "ชนกานต์", "ln": "รัตนแก้วกาญจน์"}, {"id": "31080", "fn": "ชนะชัย", "ln": "ล่าบ้านหลวง"}, {"id": "31082", "fn": "ชนะศักดิ์", "ln": "ดียิ่ง"}, {"id": "31103", "fn": "ชินรัตน์", "ln": "มารุ่งเรือง"}, {"id": "31113", "fn": "ณภัทร", "ln": "ภัทรศีลุสนทร"}, {"id": "31114", "fn": "ณภัทร", "ln": "มัศยาอานนท์"}, {"id": "31124", "fn": "ณัฐดนัย", "ln": "สิทธิพงศ์วรกุล"}, {"id": "31127", "fn": "ณัฐธิเบศ", "ln": "จารุเพ็ง"}, {"id": "31143", "fn": "ณัฐวุฒิ", "ln": "แก้วพรมมา"}, {"id": "31147", "fn": "ณัฐวุฒิ", "ln": "สุวรรณเนตร"}, {"id": "31158", "fn": "ถิรคุณ", "ln": "สุชาตตระกูล"}, {"id": "31165", "fn": "ทศวรรษ", "ln": "สง่าเนตร"}, {"id": "31172", "fn": "ธนกร", "ln": "สุวรรณโชติ"}, {"id": "31175", "fn": "ธนเดช", "ln": "เพ็งสุขภณ"}, {"id": "31178", "fn": "ธนนนท์", "ln": "จงกลรัตน์"}, {"id": "31194", "fn": "ธนัช", "ln": "อัฑฒพงษ์"}, {"id": "31197", "fn": "ธนากร", "ln": "จันทร์แดง"}, {"id": "31213", "fn": "ธรรมรัตน์", "ln": "ศุขไพบูลย์"}, {"id": "31219", "fn": "ธีรทัศน์", "ln": "ปีกขุนทด"}, {"id": "31229", "fn": "นนทวิทย์", "ln": "สินอุดม"}, {"id": "31234", "fn": "นภพล", "ln": "อรัญพูล"}, {"id": "31236", "fn": "นราชัย", "ln": "ชเยมะ"}, {"id": "31262", "fn": "ปกรณ์", "ln": "สิริจันโท"}, {"id": "31263", "fn": "ปฏิภาณ", "ln": "นวลสุวรรณ์"}, {"id": "31273", "fn": "ปรัชญา", "ln": "คุ้มล้วนล้อม"}, {"id": "31278", "fn": "ปริตต์", "ln": "ยุกตะทัต"}, {"id": "31281", "fn": "ปวีร์", "ln": "บุญเกตุ"}, {"id": "31301", "fn": "พชรพล", "ln": "ทองหยอด"}, {"id": "31302", "fn": "พรชัย", "ln": "สร้อยศรี"}, {"id": "31303", "fn": "พรพล", "ln": "กลิ่นผกา"}, {"id": "31304", "fn": "พรภวิษย์", "ln": "กลับไชย"}, {"id": "31305", "fn": "พริษฐ์", "ln": "ชูกิจคุณ"}, {"id": "31312", "fn": "พัทธพล", "ln": "ณ นคร"}, {"id": "31314", "fn": "พัศพงศ์", "ln": "คำกลิ้ง"}, {"id": "31321", "fn": "พิทวัส", "ln": "สอนดี"}, {"id": "31326", "fn": "พิสุทธิ์", "ln": "ทิพยเสม"}, {"id": "31341", "fn": "ภาคภูมิ", "ln": "ศักดิ์พรม"}, {"id": "31347", "fn": "ภาณุมาศ", "ln": "เสวก"}, {"id": "31349", "fn": "ภาณุวุฒิ", "ln": "โสธรชัย"}, {"id": "31350", "fn": "ภานุวัฒน์", "ln": "ธรรมนิทา"}, {"id": "31361", "fn": "ภูริวัฒ", "ln": "อาศิรวาท"}, {"id": "31365", "fn": "มฆวัน", "ln": "ปึกขาว"}, {"id": "31393", "fn": "ราเชนทร์", "ln": "ชลหาญ"}, {"id": "31402", "fn": "วชิระ", "ln": "อาษานอก"}, {"id": "31407", "fn": "วรท", "ln": "โกสุมวัชราภรณ์"}, {"id": "31421", "fn": "วัชรพงษ์", "ln": "สอนจันทร์"}, {"id": "31425", "fn": "วัชระ", "ln": "ตันเกษม"}, {"id": "31433", "fn": "วิชชา", "ln": "บัวธรรม"}, {"id": "31442", "fn": "วีรพล", "ln": "สุวรรณทัต"}, {"id": "31454", "fn": "ศิรภัสร์", "ln": "เทียนพันธุ์"}, {"id": "31455", "fn": "ศิรฤกษ์", "ln": "ภู่โกสีย์"}, {"id": "31463", "fn": "ศิวกร", "ln": "วรวิบูลย์สวัสดิ์"}, {"id": "31478", "fn": "สพลดนัย", "ln": "เติมทองไชย"}, {"id": "31486", "fn": "สรวิศ", "ln": "ตุ้มทรัพย์"}, {"id": "31493", "fn": "สิทธิโชค", "ln": "ช่วยชนะ"}, {"id": "31495", "fn": "สิรภพ", "ln": "เย็นทรวง"}, {"id": "31506", "fn": "สุทธิพงศ์", "ln": "บุญเลิศ"}, {"id": "31513", "fn": "สุริยพงษ์", "ln": "ขาวสำลี"}, {"id": "31514", "fn": "สุวิชา", "ln": "ธรรมโชติ"}, {"id": "31531", "fn": "อนุรักษ์", "ln": "บุญรุ่ง"}, {"id": "31534", "fn": "อภิรักษ์", "ln": "อารีพันธุ์"}, {"id": "31549", "fn": "อัฎฮา", "ln": "บัวเชย"}, {"id": "31551", "fn": "อาทิตย์", "ln": "ทุมบาล"}, {"id": "31556", "fn": "อิมพัลส์", "ln": "อัสโย"}, {"id": "31561", "fn": "เอกอัคร", "ln": "โพธิ์ทอง"}];
 const $=id=>document.getElementById(id);
 const sel=()=>ROSTER.find(p=>p.id===$('who').value)||null;
@@ -129,7 +152,8 @@ try{if(localStorage.getItem('tagSent'))setStatus('ok','เคยส่งข้�
 let db=null,userNs=null;
 (async()=>{
   try{db=await claude.use('db');userNs=await claude.use('user')}catch(e){}
-  if(userNs&&userNs.canEdit&&userNs.canEdit()&&db)startAdmin();
+  if(SHEET_URL)startAdmin(sheetSource);
+  else if(userNs&&userNs.canEdit&&userNs.canEdit()&&db)startAdmin(dbSource);
 })();
 $('f').addEventListener('submit',async e=>{
   e.preventDefault();
@@ -164,23 +188,55 @@ $('f').addEventListener('submit',async e=>{
   $('go').disabled=false;
 });
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
-function startAdmin(){
+/* admin data sources: each calls cb(rows) with [{id,first,last,text,at}] */
+function dbSource(cb,fail){
+  db.collection('responses').onSnapshot(snap=>cb(snap.docs.map(d=>d.data())),fail);
+}
+function sheetSource(cb,fail){
+  const load=()=>fetch(SHEET_URL+'?action=list').then(r=>r.json()).then(j=>{if(!j.ok)throw 0;cb(j.rows)}).catch(fail);
+  load();setInterval(load,30000);
+}
+const fmtTime=s=>{const x=new Date(s);return isNaN(x)?String(s||'').replace(/ GMT.*$/,''):x.toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})};
+async function saveFile(name,data,type){
+  try{const dl=await claude.use('downloads');if(dl){await dl.save({filename:name,data});return}}catch(e){}
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type}));a.download=name;a.click();
+}
+function startAdmin(source){
   $('admin').hidden=false;
-  db.collection('responses').onSnapshot(snap=>{
-    const docs=snap.docs.map(d=>d.data()).sort((a,b)=>a.id<b.id?-1:1);
-    const n=docs.length,tot=ROSTER.length;
-    $('prog').textContent=`ตอบแล้ว ${n} จาก ${tot} คน`;$('barFill').style.width=(n/tot*100)+'%';
-    $('rows').innerHTML=docs.map(r=>`<tr><td>${esc(r.id)}</td><td>${esc(r.first)} ${esc(r.last)}</td><td style="white-space:pre-line">${esc(r.text)}</td></tr>`).join('');
-    const done=new Set(docs.map(r=>r.id));
-    const miss=ROSTER.filter(p=>!done.has(p.id));
-    $('missing').textContent=miss.length?miss.map(p=>p.fn).join(', '):'ตอบครบแล้ว';
-    $('dl')._docs=docs;
-  },()=>{$('prog').textContent='อ่านผลสำรวจไม่ได้'});
-  $('dl').onclick=async()=>{
-    const d=$('dl')._docs||[];
-    const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
-    const csv='﻿'+['เลขประจำตัว,ชื่อ,นามสกุล,ข้อความที่ปัก'].concat(d.map(r=>[r.id,r.first,r.last,String(r.text||'').split(String.fromCharCode(10)).join(' / ')].map(q).join(','))).join('\n');
-    try{const dl=await claude.use('downloads');await dl.save({filename:'name_tag_responses.csv',data:csv})}catch(e){}
+  let rows=[],missing=[];
+  source(list=>{
+    rows=list.map(r=>({id:String(r.id),first:r.first||'',last:r.last||'',text:r.text||'',at:r.at||''})).sort((a,b)=>a.id<b.id?-1:1);
+    const n=rows.length,tot=ROSTER.length,done=new Set(rows.map(r=>r.id));
+    missing=ROSTER.filter(p=>!done.has(p.id));
+    $('prog').textContent=`ส่งแล้ว ${n} จาก ${tot} คน`;
+    $('barFill').style.width=(n/tot*100)+'%';
+    $('missHead').textContent=missing.length?`ยังไม่ส่งข้อมูล (${missing.length} คน)`:'ส่งครบทุกคนแล้ว';
+    $('missing').innerHTML='';
+    missing.forEach(p=>{const li=document.createElement('li');li.textContent=p.fn+' '+p.ln;$('missing').append(li)});
+    $('rows').innerHTML=rows.map(r=>`<tr><td>${esc(r.id)}</td><td>${esc(r.first)} ${esc(r.last)}</td><td>${esc(r.text)}</td><td>${esc(fmtTime(r.at))}</td></tr>`).join('')||'<tr><td colspan="4">ยังไม่มีข้อมูล</td></tr>';
+  },()=>{$('prog').textContent='อ่านข้อมูลไม่ได้ ลองรีเฟรชหน้านี้อีกครั้ง'});
+  $('viewAll').onclick=()=>{$('dlg').showModal()};
+  $('dclose').onclick=()=>$('dlg').close();
+  $('dlg').addEventListener('click',e=>{if(e.target===$('dlg'))$('dlg').close()});
+  const EXPORT_PIN='5259';
+  $('xl').onclick=()=>{$('pinRow').hidden=false;$('pinMsg').textContent='';$('pin').focus()};
+  $('pinRow').addEventListener('submit',async e=>{
+    e.preventDefault();
+    if($('pin').value.trim()!==EXPORT_PIN){$('pinMsg').textContent='รหัสไม่ถูกต้อง';$('pin').select();return}
+    $('pin').value='';$('pinRow').hidden=true;$('pinMsg').textContent='';
+    await exportXlsx();
+  });
+  const exportXlsx=async()=>{
+    if(typeof XLSX==='undefined'){$('prog').textContent='โหลดตัวสร้างไฟล์ Excel ไม่สำเร็จ ตรวจสอบอินเทอร์เน็ตแล้วรีเฟรช';return}
+    const wb=XLSX.utils.book_new();
+    const s1=XLSX.utils.aoa_to_sheet([['เลขประจำตัว','ชื่อ','นามสกุล','ข้อความที่ปัก','เวลาที่ส่ง']].concat(rows.map(r=>[r.id,r.first,r.last,r.text,fmtTime(r.at)])));
+    s1['!cols']=[{wch:14},{wch:18},{wch:22},{wch:34},{wch:18}];
+    const s2=XLSX.utils.aoa_to_sheet([['เลขประจำตัว','ชื่อ','นามสกุล']].concat(missing.map(p=>[p.id,p.fn,p.ln])));
+    s2['!cols']=[{wch:14},{wch:18},{wch:22}];
+    XLSX.utils.book_append_sheet(wb,s1,'ส่งแล้ว');
+    XLSX.utils.book_append_sheet(wb,s2,'ยังไม่ส่ง');
+    const out=XLSX.write(wb,{type:'array',bookType:'xlsx'});
+    await saveFile('name_tag_responses.xlsx',out,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   };
 }
 </script>
